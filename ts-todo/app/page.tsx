@@ -1,57 +1,93 @@
 "use client"
-import { useEffect, useState } from 'react';
-import Image from "next/image";
-import { getTodos, addTodo, updateTodo, deleteTodo } from '../app/lib/queries';
+import React, { useEffect, useState } from 'react'
+import { Toaster, toast } from 'react-hot-toast';
 
+interface Todo {
+  id: number,
+  text: string
+}
 
-export default function Home() {
-  const [todos, setTodos] = useState([]);
-  const [newTodo, setNewTodo] = useState("");
-
+const Page = () => {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   useEffect(() => {
-    async function loadTodos() {
-      const data = await getTodos();
-      setTodos(data);
+    const storedTodos = localStorage.getItem('todos');
+    if (storedTodos) {
+      setTodos(JSON.parse(storedTodos));
     }
-    loadTodos()
-  }, [])
+  }, []);
 
-  const handleAddTodo = async () => {
-    await addTodo(newTodo);
-    setNewTodo("");
-    setTodos(await getTodos());
+  useEffect(() => {
+    localStorage.setItem('todos', JSON.stringify(todos));
+  }, [todos]);
+
+  const handleAddorUpdateTodo = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (inputValue.trim() === "") {
+      toast.error("Please enter a todo item");
+      return;
+    }
+
+    if (editingId !== null) {
+      setTodos(todos.map(todo => (todo.id === editingId ? { ...todo, text: inputValue } : todo)));
+      setEditingId(null)
+    } else {
+      const newTodo = { id: Date.now(), text: inputValue };
+      setTodos([...todos, newTodo])
+    }
+    setInputValue("");
   }
 
-  const handleUpdateTodo = async (id: number, isComplete: boolean) => {
-    await updateTodo(id, !isComplete)
-    setTodos(await getTodos());
+  const handleEdit = (id: number) => {
+    const todoToEdit = todos.find(todo => todo.id === id);
+    if (todoToEdit) {
+      setInputValue(todoToEdit.text);
+      setEditingId(id);
+    }
   }
 
-  const handleDeleteTodo = async (id: number) => {
-    await deleteTodo(id)
-    setTodos(await getTodos());
+  const handleDelete = (id: number) => {
+    setTodos(todos.filter((todo => todo.id !== id)));
   }
 
   return (
     <>
-      <h1>Todo List</h1>
-      <input type="text" value={newTodo} onChange={(e) => setNewTodo(e.target.value)}
-        placeholder='New Todo' />
-      <button onClick={handleAddTodo}>Add</button>
-      <ul>
-        {todos.map((todo) => (
-          <li key={todo.id}>
-            <span
-              style={{ textDecoration: todo.is_complete ? 'line-through' : 'none' }}
-              onClick={() => handleUpdateTodo(todo.id, todo.is_complete)}
-            >
-              {todo.title}
-            </span>
-            <button onClick={() => handleDeleteTodo(todo.id)}>Delete</button>
-          </li>
-        ))}
-      </ul>
+      <Toaster />
+      <div className="flex items-center justify-center flex-col  w-[100vw] h-[100vh]">
+        <form onSubmit={handleAddorUpdateTodo}>
+          <input type="text" className='bg-white text-black py-3 px-4 rounded-lg' placeholder='Add Todo'
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+          />
+          <button className='bg-white text-black py-3 px-4 ml-2 rounded-lg'>
+            {editingId !== null ? "Update" : "Add"}
+          </button>
+        </form>
+
+        <div className='mt-5 bg-white text-black p-3 rounded-lg w-[300px] h-[400px] overflow-auto'>
+          {todos.length > 0 ? (
+            todos.map(todo => (
+              <div key={todo.id} className='flex justify-between items-center py-2'>
+                <p className='w-[60%] text-sm'>
+                  {todo.text}
+                </p>
+                <div className='w-[40%] flex items-center justify-end'>
+                  <button onClick={() => handleEdit(todo.id)} className='mr-2 text-white bg-blue-500 p-2 rounded-md text-xs'>Edit</button>
+                  <button onClick={() => handleDelete(todo.id)} className='text-white bg-red-500 p-2 rounded-md text-xs'>Delete</button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <h4 className='font-bold text-center'>Not Available</h4>
+          )
+          }
+        </div>
+      </div>
     </>
-  );
+  )
 }
+
+export default Page;
